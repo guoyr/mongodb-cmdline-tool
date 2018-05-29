@@ -126,7 +126,7 @@ def macos(c):
     _install_binary(c, kEvgToolURL, 'evergreen', 'evergreen', pathlib.Path.home() / 'bin', untar=False)
     c.run(f'chmod +x {pathlib.Path.home() / "bin" / "evergreen"}')  # Work around 'evergreen' not executable by default.
 
-    print_bold('Setting environment variables')
+    print_bold('Setting configurations and environment variables.')
     _set_env_vars(c)
 
 
@@ -139,6 +139,12 @@ def _set_env_vars(c):
         ]
 
         f.write('\n'.join(lines))
+
+    with open('default-evergreen-config.yml') as f:
+        conf = f.read()
+
+    with open(str(kHome / '.evergreen.yml'), 'a') as f:
+        f.write(conf)
 
 
 def _install_git_hook(c):

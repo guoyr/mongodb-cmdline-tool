@@ -1,6 +1,7 @@
 import os
 import pathlib
 import re
+import sys
 
 import jira
 import yaml
@@ -20,10 +21,16 @@ kPackageDir = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 def get_jira():
     global jira_cli
     if not jira_cli:
-        jira_cli = jira.JIRA(
-            options={'server': 'https://jira.mongodb.org'},
-            basic_auth=(jira_username, jira_password),
-        )
+        try:
+            jira_cli = jira.JIRA(
+                options={'server': 'https://jira.mongodb.org'},
+                basic_auth=(jira_username, jira_password),
+                validate=True,
+            )
+        except jira.exceptions.JIRAError as e:
+            if e.status_code == '403' or e.status_code == 403:
+                print('CAPTCHA required, please log out and log back into Jira')
+                return None
 
     return jira_cli
 
@@ -94,12 +101,14 @@ def new(c, ticket_number, branch='master'):
         c.run(f'git rebase origin/{branch}')
         c.run(f'git checkout -B server{ticket_number}', hide='both')
 
-        issue = get_jira().issue(f'SERVER-{ticket_number}')
-        if issue.fields.status.id == '1':  # '1' = Open
-            print_bold('Transitioning Issue in Jira to "In Progress"')
-            get_jira().transition_issue(issue, '4')  # '4' = Start Progress
-        else:
-            print_bold('Issue in Jira is not in "Open" status, not updating Jira')
+        jirac = get_jira()
+        if jirac:
+            issue = jirac.issue(f'SERVER-{ticket_number}')
+            if issue.fields.status.id == '1':  # '1' = Open
+                print_bold('Transitioning Issue in Jira to "In Progress"')
+                jirac.transition_issue(issue, '4')  # '4' = Start Progress
+            else:
+                print_bold('Issue in Jira is not in "Open" status, not updating Jira')
 
 
 @task(aliases='s')
@@ -150,33 +159,42 @@ def review(c, new_cr=False):
     if commit_num != branch_num:
         raise ValueError('Please commit your changes before submitting them for review.')
 
-    reviews = _load_cache(c)['reviews']
-
-    if commit_num in reviews:
-        issue_number = reviews[commit_num]
+    cache = _load_cache(c)
+    if commit_num in cache and 'cr' in cache[commit_num]:
+        issue_number = cache[commit_num]['cr']
     else:
+        cache[commit_num] = {}
         issue_number = None
 
-    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout.strip()
     cmd = f'python2 {kPackageDir / "upload.py"} --rev HEAD~1 --nojira -y'
     if issue_number and not new_cr:
         cmd += f' -i {issue_number}'
     else:
         # New issue, add title.
-        cmd += f' -t {commit_msg}'
+        cmd += f' -t "{commit_msg}"'
 
     res = c.run(cmd)
 
-    match = re.search('Issue created. URL: (.*+)', res.stdout)
+    match = re.search('Issue created. URL: (.*)', res.stdout)
     if match:
-        print(match.group(1))
+        url = match.group(1)
+        issue_number = url.split('/')[-1]
+        jirac = get_jira()
+        if jirac:
+            ticket = get_jira().issue(f'SERVER-{commit_num}')
+            get_jira().add_comment(
+                ticket,
+                f'CR: {url}',
+                visibility={'type': 'role', 'value': 'Developers'}
+            )
 
-    # if False:
-        # If there's no issue number, we assume it's a new issue so we append a comment to Jira,
-        # issue = get_jira().issue(f'SERVER-{commit_num}')
-        # comment = get_jira().add_comment(
-        #     issue, f'CR: {}', visibility={'type': 'role', 'value': 'Administrators'})  # for admins only
+    if not issue_number:
+        raise ValueError('Something went wrong, no CR issue number found')
 
+    cache[commit_num]['cr'] = issue_number
+
+    _store_cache(c, cache)
 
 
 @task(aliases='p')
