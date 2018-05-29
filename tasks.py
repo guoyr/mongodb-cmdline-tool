@@ -42,11 +42,20 @@ def init(c):
     jira_password = get_jira_pwd()
 
 
-def strip_proj(ticket_number):
+def _strip_proj(ticket_number):
     match = re.search(r'[0-9]+', ticket_number)
     if not match:
         raise ValueError(f'{ticket_number} is not a valid ticket number')
     return match.group(0)
+
+
+def _get_ticket_numbers(c):
+    """Get the ticket numbers from the commit and the branch."""
+    branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
+    ticket_number = _strip_proj(branch)
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', ).stdout
+    commit_ticket_number = _strip_proj(commit_msg)
+    return commit_ticket_number, ticket_number
 
 
 @task(aliases='n', positional=['ticket_number'], optional=['branch'])
@@ -58,7 +67,7 @@ def new(c, ticket_number, branch='master'):
     :param branch: Base branch for this ticket. Default: master.
     """
     init(c)
-    ticket_number = strip_proj(ticket_number)
+    ticket_number = _strip_proj(ticket_number)
 
     res = c.run(f'git rev-parse --verify server{ticket_number}', warn=True, hide=True)
     if res.return_code == 0:
@@ -100,23 +109,24 @@ def lint(c, eslint=False):
         c.run('python2 buildscripts/clang_format.py format')
 
 
-@task(aliases='c', optional=['fixup'])
-def commit(c, fixup=True):
+@task(aliases='c')
+def commit(c):
     """
     Wrapper around git commit to automatically add changes and fill in the ticket number in the commit message.
-
-    :param fixup: Whether ot squash uncommitted changes into the latest commit. Default: True.
     """
-    branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
-    ticket_number = strip_proj(branch)
+
     c.run('git add -u')
-    if fixup:
-        commit_msg = c.run('git log --oneline -1 --pretty=%s', ).stdout
-        commit_ticket = strip_proj(commit_msg)
-        if commit_ticket == ticket_number:
-            c.run('git commit --amend --no-edit')
-    raw_commit_msg = input('Please enter the commit message (without ticket number): ')
-    c.run(f'git commit -m "SERVER-{ticket_number} {raw_commit_msg}"')
+    c.run('git add src/')
+    c.run('git add jstests/')
+
+    commit_num, branch_num = _get_ticket_numbers(c)
+
+    if commit_num == branch_num:
+        c.run('git commit --amend --no-edit')
+    else:
+        raw_commit_msg = input('Please enter the commit message (without ticket number): ')
+        c.run(f'git commit -m "SERVER-{commit_num} {raw_commit_msg}"')
+
     print_bold('Committed local changes')
 
 
