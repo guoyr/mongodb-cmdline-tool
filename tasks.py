@@ -192,7 +192,7 @@ def review(c, new_cr=False):
             )
 
     if not issue_number:
-        raise ValueError('Something went wrong, no CR issue number found')
+        raise ValueError('Something went wrong, no CR issue number was found')
 
     cache[commit_num]['cr'] = issue_number
 
@@ -201,7 +201,7 @@ def review(c, new_cr=False):
 
 @task(aliases='p')
 def patch(c):
-    print('patch')
+    pass
 
 
 @task(aliases='u')
