@@ -113,6 +113,15 @@ def patch(c):
     print('patch')
 
 
-@task(aliases='f', optional=['push'])
+@task(aliases='u')
+def self_update(c):
+    with c.cd(os.path.dirname(os.path.realpath(__file__))):
+        c.run('git pull --rebase', warn=False)
+
+
+@task(aliases='f', optional=['push'], post=[self_update])
 def finalize(c, push=False):
     print('finalize')
+
+
+

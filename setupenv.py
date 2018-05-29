@@ -76,7 +76,6 @@ def macos(c):
     evergreen default build variants and tasks, tasks vary by team
 
     """
-
     get_passwords(c)
 
     print_bold('Checking sudo password is correct')
@@ -257,3 +256,4 @@ def macos_extra(c):
     """
     print_bold('Installing CLion')
     c.run('brew cask reinstall clion')
+

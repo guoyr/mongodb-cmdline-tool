@@ -4,7 +4,7 @@ import sys
 
 import yaml
 
-config_path = pathlib.Path.home() / '.config' / 'mongodb-cmdline-tool'
+config_path = pathlib.Path.home() / '.config' / 'mongodb-cmdline-tool' / 'config'
 
 
 def print_bold(msg):
