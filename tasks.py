@@ -79,6 +79,10 @@ def _store_cache(c, cache_dict):
     with open(str(kPackageDir / 'cache'), 'w') as cache_file:
         yaml.dump(cache_dict, cache_file)
 
+def _git_refresh(c, branch):
+    c.run(f'git checkout {branch}')
+    c.run(f'git fetch origin {branch}')
+    c.run(f'git rebase origin/{branch}')
 
 @task(aliases='n', positional=['ticket_number'], optional=['branch'])
 def new(c, ticket_number, branch='master'):
@@ -97,9 +101,7 @@ def new(c, ticket_number, branch='master'):
         c.run(f'git checkout server{ticket_number}')
     else:
         print_bold(f'Updating {branch} to latest and creating new branch: server{ticket_number}')
-        c.run(f'git checkout {branch}')
-        c.run(f'git fetch origin {branch}')
-        c.run(f'git rebase origin/{branch}')
+        _git_refresh(c, branch)
         c.run(f'git checkout -B server{ticket_number}', hide='both')
 
         jirac = get_jira()
@@ -202,12 +204,38 @@ def review(c, new_cr=False):
     _store_cache(c, cache)
 
 
-@task(aliases='p')
-def patch(c):
+@task(aliases='p', optional=['branch', 'finalize'])
+def patch(c, branch='master', finalize=True):
+    """
+    Run patch build in Evergreen.
+
+    :return:
+    """
     init(c)
-    commit_num, branch_num = _get_ticket_numbers(c)
-    if commit_num != branch_num:
-        raise ValueError('Please commit your changes before submitting them for review.')
+    temp_branch = 'patch-build-branch'
+    feature_branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout.strip()
+
+    try:
+        commit_num, branch_num = _get_ticket_numbers(c)
+        if commit_num != branch_num:
+            raise ValueError('Please commit your changes before putting up a patch build.')
+
+        c.run(f'git checkout -B {temp_branch}')
+        _git_refresh(c, branch)
+        c.run(f'git checkout {temp_branch}')
+        res = c.run(f'git rebase {branch}', warn=True)
+        if res.return_code != 0:
+            print(f'[WARNING] {feature_branch} did not rebase cleanly. Please manually run '
+                  f'"git rebase {branch}" and retry the patch build again')
+            c.run('git rebase --abort')
+        else:
+            cmd = f'evergreen patch -y -d "{commit_msg}"'
+            if finalize:
+                cmd += ' -f'
+            c.run(cmd)
+    finally:
+        c.run(f'git checkout {feature_branch}')
 
 
 @task(aliases='u')
