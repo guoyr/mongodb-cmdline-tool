@@ -51,9 +51,9 @@ def _strip_proj(ticket_number):
 
 def _get_ticket_numbers(c):
     """Get the ticket numbers from the commit and the branch."""
-    branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
+    branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
     ticket_number = _strip_proj(branch)
-    commit_msg = c.run('git log --oneline -1 --pretty=%s', ).stdout
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout
     commit_ticket_number = _strip_proj(commit_msg)
     return commit_ticket_number, ticket_number
 
