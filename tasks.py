@@ -117,6 +117,7 @@ def scons(c):
     """
     [unused at the moment] Wrapper around "python buildscripts/scons.py".
     """
+    init(c)
     num_cpus = os.cpu_count()
 
 
@@ -127,6 +128,7 @@ def lint(c, eslint=False):
 
     :param eslint: Run ESLint for JS files. Default: False.
     """
+    init()
     with c.cd(str(kHome / 'mongo')):
         if eslint:
             c.run('python2 buildscripts/eslint.py fix')
@@ -138,7 +140,7 @@ def commit(c):
     """
     Wrapper around git commit to automatically add changes and fill in the ticket number in the commit message.
     """
-
+    init(c)
     c.run('git add -u')
     c.run('git add src/')
     c.run('git add jstests/')
@@ -156,6 +158,7 @@ def commit(c):
 
 @task(aliases='r', optional=['new_cr'])
 def review(c, new_cr=False):
+    init(c)
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
         raise ValueError('Please commit your changes before submitting them for review.')
@@ -201,7 +204,10 @@ def review(c, new_cr=False):
 
 @task(aliases='p')
 def patch(c):
-    pass
+    init(c)
+    commit_num, branch_num = _get_ticket_numbers(c)
+    if commit_num != branch_num:
+        raise ValueError('Please commit your changes before submitting them for review.')
 
 
 @task(aliases='u')
@@ -213,7 +219,7 @@ def self_update(c):
 
 @task(aliases='f', optional=['push'], post=[self_update])
 def finalize(c, push=False):
-    print('finalize')
+    init(c)
 
 
 
