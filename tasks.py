@@ -12,8 +12,7 @@ jira_username = None
 jira_password = None
 jira_cli = None
 
-cwd = os.getcwd()
-
+kHome = pathlib.Path.home()
 
 kPackageDir = os.path.dirname(os.path.realpath(__file__))
 
@@ -56,7 +55,7 @@ def new(c, ticket_number, branch='master'):
     Create or switch to the branch for a ticket.
 
     :param ticket_number: Digits of the Jira ticket.
-    :param branch: Base branch for this ticket, defaults to "master".
+    :param branch: Base branch for this ticket. Default: master.
     """
     init(c)
     ticket_number = strip_proj(ticket_number)
@@ -80,9 +79,25 @@ def new(c, ticket_number, branch='master'):
             print_bold('Issue in Jira is not in "Open" status, not updating Jira')
 
 
-# @task(aliases='s')
-# def scons(c):
-#     num_cpus = os.cpu_count()
+@task(aliases='s')
+def scons(c):
+    """
+    [unused at the moment] Wrapper around "python buildscripts/scons.py".
+    """
+    num_cpus = os.cpu_count()
+
+
+@task(aliases='l', optional=['eslint'])
+def lint(c, eslint=False):
+    """
+    Wrapper around clang_format and eslint.
+
+    :param eslint: Run ESLint for JS files. Default: False.
+    """
+    with c.cd(str(kHome / 'mongo')):
+        if eslint:
+            c.run('python2 buildscripts/eslint.py fix')
+        c.run('python2 buildscripts/clang_format.py format')
 
 
 @task(aliases='c', optional=['fixup'])
@@ -90,7 +105,7 @@ def commit(c, fixup=True):
     """
     Wrapper around git commit to automatically add changes and fill in the ticket number in the commit message.
 
-    :param fixup: Whether to squash uncommitted changes into the latest commit.
+    :param fixup: Whether ot squash uncommitted changes into the latest commit. Default: True.
     """
     branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
     ticket_number = strip_proj(branch)
