@@ -171,11 +171,11 @@ def review(c, new_cr=False):
     if match:
         print(match.group(1))
 
-    if False:
+    # if False:
         # If there's no issue number, we assume it's a new issue so we append a comment to Jira,
-        issue = get_jira().issue(f'SERVER-{commit_num}')
-        comment = get_jira().add_comment(
-            issue, f'CR: {}', visibility={'type': 'role', 'value': 'Administrators'})  # for admins only
+        # issue = get_jira().issue(f'SERVER-{commit_num}')
+        # comment = get_jira().add_comment(
+        #     issue, f'CR: {}', visibility={'type': 'role', 'value': 'Administrators'})  # for admins only
 
 
 
