@@ -67,15 +67,16 @@ def _get_ticket_numbers(c):
 
 def _load_cache(c):
     try:
-        with open('cache', 'r') as cache_file:
-            return yaml.load(cache_file)
+        with open(str(kPackageDir / 'cache'), 'r') as cache_file:
+            cache = yaml.load(cache_file)
+            return cache or {}
     except IOError:
         # File doesn't exist.
         return {}
 
 
 def _store_cache(c, cache_dict):
-    with open('cache', 'w') as cache_file:
+    with open(str(kPackageDir / 'cache'), 'w') as cache_file:
         yaml.dump(cache_dict, cache_file)
 
 
@@ -167,7 +168,8 @@ def review(c, new_cr=False):
         issue_number = None
 
     commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout.strip()
-    cmd = f'python2 {kPackageDir / "upload.py"} --rev HEAD~1 --nojira -y'
+    cmd = f'python2 {kPackageDir / "upload.py"} --rev HEAD~1 --nojira -y ' \
+          f'--git_similarity 90 --check-clang-format --check-eslint'
     if issue_number and not new_cr:
         cmd += f' -i {issue_number}'
     else:
