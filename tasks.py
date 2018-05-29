@@ -14,7 +14,7 @@ jira_cli = None
 
 kHome = pathlib.Path.home()
 
-kPackageDir = os.path.dirname(os.path.realpath(__file__))
+kPackageDir = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
 
 
 def get_jira():
@@ -56,6 +56,20 @@ def _get_ticket_numbers(c):
     commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout
     commit_ticket_number = _strip_proj(commit_msg)
     return commit_ticket_number, ticket_number
+
+
+def _load_cache(c):
+    try:
+        with open('cache', 'r') as cache_file:
+            return yaml.load(cache_file)
+    except IOError:
+        # File doesn't exist.
+        return {}
+
+
+def _store_cache(c, cache_dict):
+    with open('cache', 'w') as cache_file:
+        yaml.dump(cache_dict, cache_file)
 
 
 @task(aliases='n', positional=['ticket_number'], optional=['branch'])
@@ -132,7 +146,37 @@ def commit(c):
 
 @task(aliases='r', optional=['new_cr'])
 def review(c, new_cr=False):
-    print('review')
+    commit_num, branch_num = _get_ticket_numbers(c)
+    if commit_num != branch_num:
+        raise ValueError('Please commit your changes before submitting them for review.')
+
+    reviews = _load_cache(c)['reviews']
+
+    if commit_num in reviews:
+        issue_number = reviews[commit_num]
+    else:
+        issue_number = None
+
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout
+    cmd = f'python2 {kPackageDir / "upload.py"} --rev HEAD~1 --nojira -y'
+    if issue_number and not new_cr:
+        cmd += f' -i {issue_number}'
+    else:
+        # New issue, add title.
+        cmd += f' -t {commit_msg}'
+
+    res = c.run(cmd)
+
+    match = re.search('Issue created. URL: (.*+)', res.stdout)
+    if match:
+        print(match.group(1))
+
+    if False:
+        # If there's no issue number, we assume it's a new issue so we append a comment to Jira,
+        issue = get_jira().issue(f'SERVER-{commit_num}')
+        comment = get_jira().add_comment(
+            issue, f'CR: {}', visibility={'type': 'role', 'value': 'Administrators'})  # for admins only
+
 
 
 @task(aliases='p')
@@ -142,7 +186,7 @@ def patch(c):
 
 @task(aliases='u')
 def self_update(c):
-    with c.cd(kPackageDir):
+    with c.cd(str(kPackageDir)):
         c.run('git fetch', warn=False)
         c.run('git rebase', warn=False)
 
