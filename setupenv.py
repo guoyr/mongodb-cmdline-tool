@@ -32,11 +32,13 @@ kEvgToolURL = 'https://evergreen.mongodb.com/clients/darwin_amd64/evergreen'
 kEvgConfigPath = pathlib.Path.home() / '.evergreen.yml'
 
 # GitHub constants
-kGitHubAddSSHHelpURL = 'https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/#platform-mac'
+kGitHubAddSSHHelpURL = 'https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/#adding-your-ssh-key-to-the-ssh-agent/#platform-mac'
 kRepositoryURLs = {
-    'mongo': 'git@github.com:mongodb/mongo.git',
-    'kernel-tools': 'git@github.com:10gen/kernel-tools.git'
+    'mongo': 'git@github.com:mongodb/mongo.git'
+    # 'kernel-tools': 'git@github.com:10gen/kernel-tools.git'
 }
+
+kPackageDir = os.path.dirname(os.path.realpath(__file__))
 
 # Runtime configuration
 jira_username = None
@@ -64,7 +66,7 @@ def get_passwords(c):
 @task
 def macos(c):
     """
-    Set up MongoDB core server development environment on MacOS
+    Set up MongoDB core server development environment on MacOS. Please run this task with "-w"
 
     set $EDITOR
     clang-format, eslint, pylinter
@@ -80,9 +82,6 @@ def macos(c):
 
     print_bold('Checking sudo password is correct')
     c.sudo('ls', warn=False, hide='both', password=sudo_password)
-
-    print_bold('Setting Evergreen Configuration')
-    _set_evergreen_config(c)
 
     print_bold('Setting Evergreen Configuration')
     _set_evergreen_config(c)
@@ -107,13 +106,17 @@ def macos(c):
     print_bold('Installing Text Editor')
     _install_editor(c)
 
+    print_bold('Setting Evergreen Configuration')
+    _set_evergreen_config(c)
+
+    # TODO: remove this step when the toolchain Python works.
     print_bold('Installing python')
-    c.run('brew install python3 python@2', warn=False)
-    c.run('pip3 install --upgrade pip setuptools', warn=False)
-    c.run('pip2 install --upgrade pip setuptools', warn=False)
+    c.run('brew install --upgrade python3 python@2', hide='both') # Ignore errors
+    c.run('pip3 install --upgrade pip setuptools', warn=False, hide='both')
+    c.run('pip2 install --upgrade pip setuptools', warn=False, hide='both')
     with c.cd(f'{kHome / "mongo"}'):
-        c.run('pip3 install -r buildscripts/requirements.txt', warn=False)
-        c.run('pip2 install -r buildscripts/requirements.txt', warn=False)
+        c.run('pip3 install -r buildscripts/requirements.txt') # Ignore permission errors.
+        c.run('pip2 install -r buildscripts/requirements.txt') # Ignore permission errors.
         c.run('pip2 install regex', warn=False)
 
     print_bold('Installing MongoDB Toolchain')
@@ -128,8 +131,14 @@ def macos(c):
 
 
 def _set_env_vars(c):
-    # TODO: figure out why the toolchain python can't use md5.
-    pass
+    # TODO: add toolchain path when the toolchain Python works.
+    with open('profile', 'w') as f:
+        lines = [
+            f'export EDITOR={env_editor}',
+            f'export PATH=$HOME/bin:$PATH'
+        ]
+
+        f.write('\n'.join(lines))
 
 
 def _install_git_hook(c):
@@ -154,7 +163,7 @@ def _create_db_dir(c):
 
 def _checkout_repo(c, name, url):
     parent_dir = kHome
-    with c.cd(parent_dir):
+    with c.cd(str(parent_dir)):
         if os.path.exists(parent_dir / name):
             print(f'Found existing directory {parent_dir / name}, skipping cloning {url}')
         else:
@@ -164,16 +173,13 @@ def _checkout_repo(c, name, url):
 def _create_ssh_keys(c):
     if os.path.isfile(pathlib.Path.home() / '.ssh' / 'id_rsa'):
         print('Found existing id_rsa, skipping creating ssh keys')
-    else:
-        # TODO
-        pass
+        return
 
     res = input(format_bold('Opening browser for instructions to setting up ssh keys in GitHub, '
-                            'press any key to continue, enter "skip" to skip: '))
-
+                                'press any key to continue, enter "skip" to skip: '))
     if res != 'skip':
         webbrowser.open(kGitHubAddSSHHelpURL)
-        input(format_bold('Press any key to continue'))
+        input(format_bold('Once you\'ve generated SSH keys and added them to GitHub, press any key to continue'))
     else:
         print('Skipping adding SSH Keys to GitHub')
 
@@ -184,8 +190,12 @@ def _set_evergreen_config(c):
     if os.path.isfile(kEvgConfigPath):
         print('Found existing ~/.evergreen.yml, skipping adding Evergreen configuration')
     else:
-        # TODO
-        pass
+        input('Opening browser to configure Evergreen Authentication credentials, press any key to'
+              'continue')
+        webbrowser.open('https://evergreen.mongodb.com/settings')
+
+        input('Once you have added your credentials to ~/.evergreen.yml and entered your user and '
+              'notification settings on the web UI, press any key to continue')
 
     with open(pathlib.Path.home() / '.evergreen.yml') as evg_file:
         evg_config = yaml.load(evg_file)
@@ -255,5 +265,8 @@ def macos_extra(c):
     :return:
     """
     print_bold('Installing CLion')
-    c.run('brew cask reinstall clion')
+    # c.run('brew cask reinstall clion')
+    with c.cd(kPackageDir):
+        c.run('cp mongo-cmakelists.txt ~/mongo/CMakeLists.txt')
+
 

@@ -15,6 +15,9 @@ jira_cli = None
 cwd = os.getcwd()
 
 
+kPackageDir = os.path.dirname(os.path.realpath(__file__))
+
+
 def get_jira():
     global jira_cli
     if not jira_cli:
@@ -77,10 +80,9 @@ def new(c, ticket_number, branch='master'):
             print_bold('Issue in Jira is not in "Open" status, not updating Jira')
 
 
-@task(aliases='s')
-def scons(c):
-    # TODO
-    num_cpus = os.cpu_count()
+# @task(aliases='s')
+# def scons(c):
+#     num_cpus = os.cpu_count()
 
 
 @task(aliases='c', optional=['fixup'])
@@ -115,7 +117,7 @@ def patch(c):
 
 @task(aliases='u')
 def self_update(c):
-    with c.cd(os.path.dirname(os.path.realpath(__file__))):
+    with c.cd(kPackageDir):
         c.run('git fetch', warn=False)
         c.run('git rebase', warn=False)
 
