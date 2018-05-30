@@ -281,8 +281,23 @@ def macos_extra(c):
     :param c:
     :return:
     """
+    print_bold('Installing ninja')
+    c.run('brew install --upgrade ninja')
+
+    modules_dir = str(kHome / 'mongo' / 'src' / 'mongo' / 'db' / 'modules')
+    c.run(f'mkdir -p {modules_dir}')
+
+    with c.cd(modules_dir):
+        c.run('git clone https://github.com/RedBeard0531/mongo_module_ninja ninja', warn=True)
+    with c.cd(str(kHome / 'mongo')):
+        ninja_cmd = 'python buildscripts/scons.py CC=clang CXX=clang++ '
+        ninja_cmd += 'CCFLAGS=-Wa,--compress-debug-sections '
+        ninja_cmd += 'MONGO_VERSION=\'0.0.0\' MONGO_GIT_HASH=\'unknown\' '
+        ninja_cmd += 'VARIANT_DIR=ninja --modules=ninja build.ninja'
+        c.run(ninja_cmd)
+
     print_bold('Installing CLion')
-    # c.run('brew cask reinstall clion')
+    c.run('brew cask install clion', warn=True)
     with c.cd(kPackageDir):
         c.run('cp mongo-cmakelists.txt ~/mongo/CMakeLists.txt')
 

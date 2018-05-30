@@ -10,7 +10,7 @@ config = {
 }
 
 ns = Collection.from_module(tasks, config=config)
-ns.add_collection(Collection.from_module(setupenv, name='setup-dev-environment', config=config))
+ns.add_collection(Collection.from_module(setupenv, name='setup-dev-env', config=config))
 
 
 class MyProgram(Program):

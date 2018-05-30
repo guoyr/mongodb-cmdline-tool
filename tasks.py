@@ -1,6 +1,7 @@
 import os
 import pathlib
 import re
+import sys
 import webbrowser
 
 import jira
@@ -33,7 +34,7 @@ def get_jira():
                 print('CAPTCHA required, please log out and log back into Jira')
                 return None
         except:
-            print('Failed to connect to Jira. (Fix incoming!)')
+            print('Failed to connect to Jira')
 
     return jira_cli
 
@@ -55,7 +56,8 @@ def init(c):
 def _strip_proj(ticket_number):
     match = re.search(r'[0-9]+', ticket_number)
     if not match:
-        raise ValueError(f'{ticket_number} is not a valid ticket number')
+        print(f'[ERROR] {ticket_number} is not a valid ticket number')
+        sys.exit(1)
     return match.group(0)
 
 
@@ -91,6 +93,13 @@ def _git_refresh(c, branch):
     c.run(f'git checkout {old_branch}')
 
 
+def _post_update_steps(c):
+    """
+    Additional steps to run after a git update.
+    """
+    pass
+
+
 @task(aliases='n', positional=['ticket_number'], optional=['branch'])
 def new(c, ticket_number, branch='master'):
     """
@@ -114,19 +123,21 @@ def new(c, ticket_number, branch='master'):
         if jirac:
             issue = jirac.issue(f'SERVER-{ticket_number}')
             if issue.fields.status.id == '1':  # '1' = Open
-                print_bold('Transitioning Issue in Jira to "In Progress"')
+                print_bold(f'Transitioning SERVER-{ticket_number} in Jira to "In Progress"')
                 jirac.transition_issue(issue, '4')  # '4' = Start Progress
             else:
-                print_bold('Issue in Jira is not in "Open" status, not updating Jira')
+                print_bold(
+                    f'SERVER-{ticket_number} in Jira is not in "Open" status, not updating Jira')
 
 
 @task(aliases='s')
 def scons(c):
     """
-    Step 2: [unused at the moment] Check your code compiles, wrapper around "python buildscripts/scons.py".
+    Step 2: [experimental] Check your code compiles, wrapper around "python buildscripts/scons.py".
     """
     init(c)
-    # num_cpus = os.cpu_count()
+    num_cpus = os.cpu_count()
+    c.run(f'ninja -j{num_cpus}')
 
 
 @task(aliases='l', optional=['eslint'])
@@ -146,13 +157,10 @@ def lint(c, eslint=False):
 @task(aliases='c')
 def commit(c):
     """
-    Step 4: Wrapper around git commit to automatically add changes and fill in the ticket number in the
-    commit message.
+    Step 4: Wrapper around git commit to automatically add changes and fill in the ticket number in the commit message.
     """
     init(c)
     c.run('git add -u')
-    c.run('git add src/')
-    c.run('git add jstests/')
 
     commit_num, branch_num = _get_ticket_numbers(c)
 
@@ -175,7 +183,8 @@ def review(c, new_cr=False):
     init(c)
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
-        raise ValueError('Please commit your changes before submitting them for review.')
+        print( '[ERROR] Please commit your local changes before submitting them for review.')
+        sys.exit(1)
 
     cache = _load_cache(c)
     if commit_num in cache and 'cr' in cache[commit_num]:
@@ -193,7 +202,8 @@ def review(c, new_cr=False):
         # New issue, add title.
         cmd += f' -t "{commit_msg}"'
 
-    res = c.run(cmd)
+    print('Authenticating with OAuth2... If your browser did not open, press enter')
+    res = c.run(cmd, hide='stdout')
 
     match = re.search('Issue created. URL: (.*)', res.stdout)
     if match:
@@ -203,23 +213,36 @@ def review(c, new_cr=False):
         jirac = get_jira()
         if jirac:
             ticket = get_jira().issue(f'SERVER-{commit_num}')
-            get_jira().add_comment(
-                ticket,
-                f'CR: {url}',
-                visibility={'type': 'role', 'value': 'Developers'}
-            )
+
+            # Transition Ticket
+            if ticket.fields.status.id == '3':  # '3' = In Progress.
+                print_bold(f'Transitioning SERVER-{branch_num} in Jira to "Start Code Review"')
+                jirac.transition_issue(ticket, '761')  # '4' = Start Code Review
+
+                # Add comment.
+                get_jira().add_comment(
+                    ticket,
+                    f'CR: {url}',
+                    visibility={'type': 'role', 'value': 'Developers'}
+                )
+            else:
+                print_bold(
+                    f'SERVER-{branch_num} in Jira is not in "In Progress" status, not updating Jira')
         else:
             print_bold(f'Please manually add a link of your codereview to: '
                        f'https://jira.mongodb.org/browse/SERVER-{commit_num}')
 
     if not issue_number:
-        raise ValueError('Something went wrong, no CR issue number was found')
+        print('[ERROR] Something went wrong, no CR issue number was found')
+        sys.exit(1)
 
     cache[commit_num]['cr'] = issue_number
 
     _store_cache(c, cache)
 
-    webbrowser.open(f'https://mongodbcr.appspot.com/{issue_number}')
+    url = f'https://mongodbcr.appspot.com/{issue_number}'
+    print_bold(f'Opening code review page: {url}')
+    webbrowser.open(url)
 
 
 @task(aliases='p', optional=['branch', 'finalize'])
@@ -238,7 +261,8 @@ def patch(c, branch='master', finalize=False):
 
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
-        raise ValueError('Please commit your changes before putting up a patch build.')
+        print('[ERROR] Please commit your local changes before putting up a patch build.')
+        sys.exit(1)
 
     try:
         _git_refresh(c, branch)
@@ -254,6 +278,8 @@ def patch(c, branch='master', finalize=False):
             if finalize:
                 cmd += ' -f'
             c.run(cmd)
+
+            webbrowser.open('https://evergreen.mongodb.com/patches/mine')
 
             # TODO: store the link for future use.
     finally:
@@ -272,11 +298,12 @@ def finalize(c, push=False, branch='master'):
 
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
-        raise ValueError('Please commit your changes before finalizing.')
+        print('[ERROR] Please commit your local changes before finalizing.')
+        sys.exit(1)
 
     cache = _load_cache(c)
-    if commit_num not in cache:
-        del cache[commit_num]
+    if branch_num not in cache:
+        del cache[branch_num]
 
     _git_refresh(c, branch)
     c.run('git rebase master')
@@ -289,11 +316,33 @@ def finalize(c, push=False, branch='master'):
     c.run(push_cmd)
 
     if push:
-        del cache[commit_num]
+        del cache[branch_num]
         _store_cache(c, cache)
 
-    # TODO: Update Jira and close CR.
+        # jirac = get_jira()
+        # if jirac:
+        #     ticket = get_jira().issue(f'SERVER-{branch_num}')
+        #
+        #     # Transition Ticket
+        #     if ticket.fields.status.id == '10018':  # '10018' = In Code Review.
+        #         print_bold(f'Transitioning SERVER-{branch_num} in Jira to "Closed"')
+        #         jirac.transition_issue(ticket, '981')  # '981' = Close Issue
+        #     else:
+        #         print_bold(
+        #             f'SERVER-{branch_num} in Jira is not in "In Code Review" status, not updating Jira')
+        # else:
+        #     print_bold(f'Please manually add a link of your codereview to: '
+        #                f'https://jira.mongodb.org/browse/SERVER-{commit_num}')
 
+        print_bold(
+            'Please remember to close this issue add a comment of your patch build link to this '
+            'ticket if you haven\'t already. The comment should have "Developer" visibility')
+        print_bold(f'https://jira.mongodb.com/browse/SERVER-{branch_num}')
+
+    # TODO: Update Jira and close CR.
+    issue = get_jira().issue(f'SERVER-{branch_num}')
+    print(get_jira().transitions(issue))
+    print(issue.fields.status.id)
     self_update(c)
 
 
@@ -305,3 +354,4 @@ def self_update(c):
     with c.cd(str(kPackageDir)):
         c.run('git fetch', warn=False)
         c.run('git rebase', warn=False)
+        _post_update_steps(c)
