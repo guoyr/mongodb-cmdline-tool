@@ -21,6 +21,6 @@ p = MyProgram(
     binary='m(mongodb command line tool)',
     name='MongoDB Command Line Tool',
     namespace=ns,
-    version='1.0.0-alpha1')
+    version='1.0.0-alpha2')
 
 p.run()
