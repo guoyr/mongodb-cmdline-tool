@@ -161,6 +161,8 @@ def commit(c):
     """
     init(c)
     c.run('git add -u')
+    c.run('git add src/')
+    c.run('git add jstests/')
 
     commit_num, branch_num = _get_ticket_numbers(c)
 
@@ -335,8 +337,8 @@ def finalize(c, push=False, branch='master'):
         #                f'https://jira.mongodb.org/browse/SERVER-{commit_num}')
 
         print_bold(
-            'Please remember to close this issue add a comment of your patch build link to this '
-            'ticket if you haven\'t already. The comment should have "Developer" visibility')
+            'Please remember to close this issue and add a comment of your patch build link '
+            'if you haven\'t already. The comment should have "Developer" visibility')
         print_bold(f'https://jira.mongodb.com/browse/SERVER-{branch_num}')
 
     # TODO: Update Jira and close CR.
