@@ -317,7 +317,10 @@ def finalize(c, push=False, branch='master'):
     if not push:
         push_cmd += ' -n'
 
-    c.run(push_cmd)
+    res = c.run(push_cmd, warn=True)
+    if res.return_code != 0:
+        print('[ERROR] git push failed!')
+        c.run(f'git checkout {feature_branch}')
 
     if push:
         cache = _load_cache(c)
@@ -354,6 +357,7 @@ def self_update(c):
     """
     Update this tool.
     """
+    print_bold('Updating MongoDB Server Commandline Tool...')
     with c.cd(str(kPackageDir)):
         c.run('git fetch', warn=False)
         c.run('git rebase', warn=False)
