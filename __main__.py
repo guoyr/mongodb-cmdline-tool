@@ -12,7 +12,12 @@ config = {
 ns = Collection.from_module(tasks, config=config)
 ns.add_collection(Collection.from_module(setupenv, name='setup-dev-environment', config=config))
 
-p = Program(
+
+class MyProgram(Program):
+    pass
+
+
+p = MyProgram(
     binary='m(mongodb command line tool)',
     name='MongoDB Command Line Tool',
     namespace=ns,

@@ -111,7 +111,7 @@ def macos(c):
 
     # TODO: remove this step when the toolchain Python works.
     print_bold('Installing python')
-    c.run('brew install --upgrade python3 python@2', hide='both') # Ignore errors
+    c.run('brew install --upgrade python3 python2', hide='both') # Ignore errors
     c.run('pip3 install --upgrade pip setuptools', warn=False, hide='both')
     c.run('pip2 install --upgrade pip setuptools', warn=False, hide='both')
     with c.cd(f'{kHome / "mongo"}'):
@@ -134,9 +134,11 @@ def _set_env_vars(c):
     # TODO: add toolchain path when the toolchain Python works.
     with open('profile', 'w') as f:
         lines = [
-            f'export EDITOR={env_editor}',
             f'export PATH=$HOME/bin:$PATH'
         ]
+
+        if env_editor:
+            lines.append(f'export EDITOR={env_editor}')
 
         f.write('\n'.join(lines))
 
@@ -147,6 +149,7 @@ def _set_env_vars(c):
         f.write(conf)
 
 
+@task
 def _install_git_hook(c):
     mongo_hooks = kHome / ".githooks" / "mongo"
 
@@ -156,26 +159,30 @@ def _install_git_hook(c):
     with c.cd(f'{mongo_hooks}'):
         c.run('rm pre-push/check-uncommitted')
         c.run('rm pre-push/check-code-freeze-any-branch')
+        c.run('rm pre-push/check-compile')
         c.run('rm README.md')
 
     with c.cd(f'{kHome / "mongo"}'):
         c.run('source buildscripts/install-hooks -f', warn=False, hide=None)
 
 
+@task
 def _create_db_dir(c):
     c.sudo('mkdir -p /data/db', warn=False, hide='both', password=sudo_password)
     c.sudo(f'chown {getpass.getuser()} /data/db', warn=False, password=sudo_password)
 
 
+@task
 def _checkout_repo(c, name, url):
     parent_dir = kHome
     with c.cd(str(parent_dir)):
         if os.path.exists(parent_dir / name):
             print(f'Found existing directory {parent_dir / name}, skipping cloning {url}')
         else:
-            c.run(f'git clone {url}', warn=False, hide='both')
+            c.run(f'git clone {url}', warn=False)
 
 
+@task
 def _create_ssh_keys(c):
     if os.path.isfile(pathlib.Path.home() / '.ssh' / 'id_rsa'):
         print('Found existing id_rsa, skipping creating ssh keys')
@@ -190,6 +197,7 @@ def _create_ssh_keys(c):
         print('Skipping adding SSH Keys to GitHub')
 
 
+@task
 def _set_evergreen_config(c):
     global jira_username
 
@@ -208,6 +216,7 @@ def _set_evergreen_config(c):
         jira_username = evg_config['user']
 
 
+@task
 def _install_editor(c):
     global env_editor
 
@@ -241,6 +250,7 @@ def _install_editor(c):
         break
 
 
+@task
 def _install_binary(c, url, download_name, binary_name, parent_dir, untar=False):
     with c.cd(str(kDownloadsCache)):
         # Don't warn, error out immediately.
@@ -255,6 +265,7 @@ def _install_binary(c, url, download_name, binary_name, parent_dir, untar=False)
     print(f'Installed {binary_name} to {parent_dir}')
 
 
+@task
 def _check_homebrew_exists(res):
     if res.return_code == kCommandNotFound:
         raise Exit('`brew` executable not found. Please install HomeBrew: https://brew.sh')

@@ -1,7 +1,7 @@
 import os
 import pathlib
 import re
-import sys
+import webbrowser
 
 import jira
 import yaml
@@ -26,11 +26,14 @@ def get_jira():
                 options={'server': 'https://jira.mongodb.org'},
                 basic_auth=(jira_username, jira_password),
                 validate=True,
+                logging=False
             )
         except jira.exceptions.JIRAError as e:
             if e.status_code == '403' or e.status_code == 403:
                 print('CAPTCHA required, please log out and log back into Jira')
                 return None
+        except:
+            print('Failed to connect to Jira. (Fix incoming!)')
 
     return jira_cli
 
@@ -86,6 +89,7 @@ def _git_refresh(c, branch):
     c.run(f'git rebase origin/{branch}')
     c.run(f'git checkout {old_branch}')
 
+
 @task(aliases='n', positional=['ticket_number'], optional=['branch'])
 def new(c, ticket_number, branch='master'):
     """
@@ -99,8 +103,7 @@ def new(c, ticket_number, branch='master'):
 
     res = c.run(f'git rev-parse --verify server{ticket_number}', warn=True, hide=True)
     if res.return_code == 0:
-        print_bold(f'Checking out existing branch: server{ticket_number}')
-        c.run(f'git checkout server{ticket_number}')
+        c.run(f'git checkout server{ticket_number}', hide='both')
     else:
         print_bold(f'Updating {branch} to latest and creating new branch: server{ticket_number}')
         _git_refresh(c, branch)
@@ -142,7 +145,8 @@ def lint(c, eslint=False):
 @task(aliases='c')
 def commit(c):
     """
-    Wrapper around git commit to automatically add changes and fill in the ticket number in the commit message.
+    Wrapper around git commit to automatically add changes and fill in the ticket number in the
+    commit message.
     """
     init(c)
     c.run('git add -u')
@@ -155,7 +159,7 @@ def commit(c):
         c.run('git commit --amend --no-edit')
     else:
         raw_commit_msg = input('Please enter the commit message (without ticket number): ')
-        c.run(f'git commit -m "SERVER-{commit_num} {raw_commit_msg}"')
+        c.run(f'git commit -m "SERVER-{branch_num} {raw_commit_msg}"')
 
     print_bold('Committed local changes')
 
@@ -189,6 +193,7 @@ def review(c, new_cr=False):
     if match:
         url = match.group(1)
         issue_number = url.split('/')[-1]
+
         jirac = get_jira()
         if jirac:
             ticket = get_jira().issue(f'SERVER-{commit_num}')
@@ -197,6 +202,9 @@ def review(c, new_cr=False):
                 f'CR: {url}',
                 visibility={'type': 'role', 'value': 'Developers'}
             )
+        else:
+            print_bold(f'Please manually add a link of your codereview to: '
+                       f'https://jira.mongodb.org/browse/SERVER-{commit_num}')
 
     if not issue_number:
         raise ValueError('Something went wrong, no CR issue number was found')
@@ -205,13 +213,17 @@ def review(c, new_cr=False):
 
     _store_cache(c, cache)
 
+    webbrowser.open(f'https://mongodbcr.appspot.com/{issue_number}')
+
 
 @task(aliases='p', optional=['branch', 'finalize'])
-def patch(c, branch='master', finalize=True):
+def patch(c, branch='master', finalize=False):
     """
     Run patch build in Evergreen.
 
-    :return:
+
+    :param finalize: whether to finalize the patch build and have it run immediately. (Default: False)
+    :param branch: the base branch for the patch build. (Default: False)
     """
     init(c)
     temp_branch = 'patch-build-branch'
@@ -237,7 +249,7 @@ def patch(c, branch='master', finalize=True):
                 cmd += ' -f'
             c.run(cmd)
 
-            # TODO: add comment to Jira.
+            # TODO: store the link for future use.
     finally:
         c.run(f'git checkout {feature_branch}')
 
@@ -251,6 +263,13 @@ def self_update(c):
 
 @task(aliases='f', optional=['push', 'branch'], post=[self_update])
 def finalize(c, push=False, branch='master'):
+    """
+    Finalize your change
+
+    :param push:
+    :param branch:
+    :return:
+    """
     init(c)
 
     commit_num, branch_num = _get_ticket_numbers(c)
@@ -258,4 +277,19 @@ def finalize(c, push=False, branch='master'):
         raise ValueError('Please commit your changes before putting up a patch build.')
 
     _git_refresh(c, branch)
-    c.run('git pull --rebase mongo master')
+    c.run('git rebase master')
+    c.run('git checkout master')
+
+    push_cmd = 'git push'
+    if not push:
+        push_cmd += ' -n'
+
+    c.run(push_cmd)
+
+    if push:
+        cache = _load_cache(c)
+        if commit_num in cache:
+            del cache[commit_num]
+        _store_cache(c, cache)
+
+    # TODO: Update Jira and close CR.
