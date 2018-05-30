@@ -35,7 +35,7 @@ kEvgConfigPath = pathlib.Path.home() / '.evergreen.yml'
 kGitHubAddSSHHelpURL = 'https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/#adding-your-ssh-key-to-the-ssh-agent/#platform-mac'
 kRepositoryURLs = {
     'mongo': 'git@github.com:mongodb/mongo.git'
-    # 'kernel-tools': 'git@github.com:10gen/kernel-tools.git'
+    'kernel-tools': 'git@github.com:10gen/kernel-tools.git'
 }
 
 kPackageDir = os.path.dirname(os.path.realpath(__file__))
