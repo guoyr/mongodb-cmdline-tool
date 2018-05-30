@@ -303,10 +303,6 @@ def finalize(c, push=False, branch='master'):
         print('[ERROR] Please commit your local changes before finalizing.')
         sys.exit(1)
 
-    cache = _load_cache(c)
-    if branch_num not in cache:
-        del cache[branch_num]
-
     _git_refresh(c, branch)
     c.run('git rebase master')
     c.run('git checkout master')
@@ -318,8 +314,10 @@ def finalize(c, push=False, branch='master'):
     c.run(push_cmd)
 
     if push:
-        del cache[branch_num]
-        _store_cache(c, cache)
+        cache = _load_cache(c)
+        if branch_num in cache:
+            del cache[branch_num]
+            _store_cache(c, cache)
 
         # jirac = get_jira()
         # if jirac:
