@@ -288,6 +288,7 @@ def macos_extra(c):
     c.run(f'mkdir -p {modules_dir}')
 
     with c.cd(modules_dir):
+        # Ignore errors since ninja may already exist.
         c.run('git clone https://github.com/RedBeard0531/mongo_module_ninja ninja', warn=True)
     with c.cd(str(kHome / 'mongo')):
         ninja_cmd = 'python buildscripts/scons.py CC=clang CXX=clang++ '
@@ -297,6 +298,8 @@ def macos_extra(c):
         c.run(ninja_cmd)
 
     print_bold('Installing CLion')
+
+    # Ignore errors since CLion already exists.
     c.run('brew cask install clion', warn=True)
     with c.cd(kPackageDir):
         c.run('cp mongo-cmakelists.txt ~/mongo/CMakeLists.txt')

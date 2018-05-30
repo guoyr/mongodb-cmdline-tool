@@ -6,7 +6,8 @@ import tasks
 config = {
     'run': {
         'echo': True
-    }
+    },
+    'NINJA_STATUS': '[%f/%t (%p) %es]'  # make the ninja output even nicer
 }
 
 ns = Collection.from_module(tasks, config=config)
