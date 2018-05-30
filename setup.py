@@ -4,8 +4,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="mdb_cmdline_tool",
-    version="1.0.0-alpha1",
+    name="mongodb_cmdline_tool",
+    version="1.0.0-alpha2",
     author="Robert Guo",
     author_email="rob@mongodb.com",
     description="MongoDB Server Team Command Line Tool",
@@ -19,4 +19,13 @@ setuptools.setup(
         "License "" Other/Proprietary License",
         "Operating System :: MacOS :: MacOS X",
     ),
+    install_requires=[
+        'jira >= 1.0',
+        'keyring >= 12',
+        'invoke >= 1.0',
+        'pyyaml >= 3.0'
+    ],
+    entry_points={
+        'console_scripts': ['m = mongodb_cmdline_tool.__main__:main'],
+    }
 )

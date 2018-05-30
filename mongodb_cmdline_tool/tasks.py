@@ -8,7 +8,7 @@ import jira
 import yaml
 from invoke import task
 
-from utils import get_jira_pwd, print_bold
+from mongodb_cmdline_tool.utils import get_jira_pwd, print_bold
 
 jira_username = None
 jira_password = None

@@ -9,7 +9,7 @@ import yaml
 from invoke import task
 from invoke.exceptions import Exit, UnexpectedExit
 
-from utils import print_bold, format_bold, clear_screen, get_jira_pwd, save_jira_pwd
+from mongodb_cmdline_tool.utils import print_bold, format_bold, clear_screen, get_jira_pwd, save_jira_pwd
 
 # Global Constants.
 kHome = pathlib.Path.home()
