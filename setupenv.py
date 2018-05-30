@@ -130,6 +130,7 @@ def macos(c):
     _set_env_vars(c)
 
 
+@task
 def _set_env_vars(c):
     # TODO: add toolchain path when the toolchain Python works.
     with open('profile', 'w') as f:
