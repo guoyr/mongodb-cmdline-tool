@@ -346,10 +346,6 @@ def finalize(c, push=False, branch='master'):
         'if you haven\'t already. The comment should have "Developer" visibility')
     print_bold(f'https://jira.mongodb.com/browse/SERVER-{branch_num}')
 
-
-    issue = get_jira().issue(f'SERVER-{branch_num}')
-    print(get_jira().transitions(issue))
-    print(issue.fields.status.id)
     self_update(c)
 
 
