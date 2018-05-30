@@ -303,9 +303,15 @@ def finalize(c, push=False, branch='master'):
         print('[ERROR] Please commit your local changes before finalizing.')
         sys.exit(1)
 
+    feature_branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
+
     _git_refresh(c, branch)
-    c.run('git rebase master')
-    c.run('git checkout master')
+
+    res = c.run(f'git rebase {branch}', warn=True)
+    if res.return_code != 0:
+        print(f'Did not rebase cleanly onto {branch}, please manually run: git rebase {branch}')
+        c.run(f'git checkout {feature_branch}')
+    c.run(f'git checkout {branch}')
 
     push_cmd = 'git push'
     if not push:
@@ -319,6 +325,7 @@ def finalize(c, push=False, branch='master'):
             del cache[branch_num]
             _store_cache(c, cache)
 
+        # TODO: Update Jira and close CR.
         # jirac = get_jira()
         # if jirac:
         #     ticket = get_jira().issue(f'SERVER-{branch_num}')
@@ -334,12 +341,12 @@ def finalize(c, push=False, branch='master'):
         #     print_bold(f'Please manually add a link of your codereview to: '
         #                f'https://jira.mongodb.org/browse/SERVER-{commit_num}')
 
-        print_bold(
-            'Please remember to close this issue and add a comment of your patch build link '
-            'if you haven\'t already. The comment should have "Developer" visibility')
-        print_bold(f'https://jira.mongodb.com/browse/SERVER-{branch_num}')
+    print_bold(
+        'Please remember to close this issue and add a comment of your patch build link '
+        'if you haven\'t already. The comment should have "Developer" visibility')
+    print_bold(f'https://jira.mongodb.com/browse/SERVER-{branch_num}')
 
-    # TODO: Update Jira and close CR.
+
     issue = get_jira().issue(f'SERVER-{branch_num}')
     print(get_jira().transitions(issue))
     print(issue.fields.status.id)
