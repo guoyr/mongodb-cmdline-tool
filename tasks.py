@@ -82,6 +82,7 @@ def _store_cache(c, cache_dict):
     with open(str(kPackageDir / 'cache'), 'w') as cache_file:
         yaml.dump(cache_dict, cache_file)
 
+
 def _git_refresh(c, branch):
     old_branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
     c.run(f'git checkout {branch}')
@@ -93,7 +94,7 @@ def _git_refresh(c, branch):
 @task(aliases='n', positional=['ticket_number'], optional=['branch'])
 def new(c, ticket_number, branch='master'):
     """
-    Create or switch to the branch for a ticket.
+    Step 1: Create or switch to the branch for a ticket.
 
     :param ticket_number: Digits of the Jira ticket.
     :param branch: Base branch for this ticket. Default: master.
@@ -122,16 +123,16 @@ def new(c, ticket_number, branch='master'):
 @task(aliases='s')
 def scons(c):
     """
-    [unused at the moment] Wrapper around "python buildscripts/scons.py".
+    Step 2: [unused at the moment] Check your code compiles, wrapper around "python buildscripts/scons.py".
     """
     init(c)
-    num_cpus = os.cpu_count()
+    # num_cpus = os.cpu_count()
 
 
 @task(aliases='l', optional=['eslint'])
 def lint(c, eslint=False):
     """
-    Wrapper around clang_format and eslint.
+    Step 3: lint and format your code: Wrapper around clang_format and eslint.
 
     :param eslint: Run ESLint for JS files. Default: False.
     """
@@ -145,7 +146,7 @@ def lint(c, eslint=False):
 @task(aliases='c')
 def commit(c):
     """
-    Wrapper around git commit to automatically add changes and fill in the ticket number in the
+    Step 4: Wrapper around git commit to automatically add changes and fill in the ticket number in the
     commit message.
     """
     init(c)
@@ -166,6 +167,11 @@ def commit(c):
 
 @task(aliases='r', optional=['new_cr'])
 def review(c, new_cr=False):
+    """
+    Step 5: Put your code up for code review.
+
+    :param new_cr: whether to create a new code review. Use it if you have multiple CRs for the same ticket. (Default: False)
+    """
     init(c)
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
@@ -219,7 +225,7 @@ def review(c, new_cr=False):
 @task(aliases='p', optional=['branch', 'finalize'])
 def patch(c, branch='master', finalize=False):
     """
-    Run patch build in Evergreen.
+    Step 6: Run patch build in Evergreen.
 
 
     :param finalize: whether to finalize the patch build and have it run immediately. (Default: False)
@@ -254,27 +260,23 @@ def patch(c, branch='master', finalize=False):
         c.run(f'git checkout {feature_branch}')
 
 
-@task(aliases='u')
-def self_update(c):
-    with c.cd(str(kPackageDir)):
-        c.run('git fetch', warn=False)
-        c.run('git rebase', warn=False)
-
-
-@task(aliases='f', optional=['push', 'branch'], post=[self_update])
+@task(aliases='f', optional=['push', 'branch'])
 def finalize(c, push=False, branch='master'):
     """
-    Finalize your change
+    Step 7: Finalize your changes. Merge them with the base branch and optionally push upstream.
 
-    :param push:
-    :param branch:
-    :return:
+    :param push: git push your changes (Default: False)
+    :param branch: the base branch for your changes. (Default: master)
     """
     init(c)
 
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
-        raise ValueError('Please commit your changes before putting up a patch build.')
+        raise ValueError('Please commit your changes before finalizing.')
+
+    cache = _load_cache(c)
+    if commit_num not in cache:
+        del cache[commit_num]
 
     _git_refresh(c, branch)
     c.run('git rebase master')
@@ -287,9 +289,19 @@ def finalize(c, push=False, branch='master'):
     c.run(push_cmd)
 
     if push:
-        cache = _load_cache(c)
-        if commit_num in cache:
-            del cache[commit_num]
+        del cache[commit_num]
         _store_cache(c, cache)
 
     # TODO: Update Jira and close CR.
+
+    self_update(c)
+
+
+@task(aliases='u')
+def self_update(c):
+    """
+    Update this tool.
+    """
+    with c.cd(str(kPackageDir)):
+        c.run('git fetch', warn=False)
+        c.run('git rebase', warn=False)
