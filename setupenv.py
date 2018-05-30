@@ -34,7 +34,7 @@ kEvgConfigPath = pathlib.Path.home() / '.evergreen.yml'
 # GitHub constants
 kGitHubAddSSHHelpURL = 'https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/#adding-your-ssh-key-to-the-ssh-agent/#platform-mac'
 kRepositoryURLs = {
-    'mongo': 'git@github.com:mongodb/mongo.git'
+    'mongo': 'git@github.com:mongodb/mongo.git',
     'kernel-tools': 'git@github.com:10gen/kernel-tools.git'
 }
 
