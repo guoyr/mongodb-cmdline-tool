@@ -100,8 +100,8 @@ def macos(c):
     _create_db_dir(c)
 
     print_bold('Checking HomeBrew is installed')
-    res = c.run('brew --version', hide='both')
-    _check_homebrew_exists(c)
+    # res = c.run('brew --version', hide='both')
+    # _check_homebrew_exists(c)
 
     print_bold('Installing Text Editor')
     _install_editor(c)
