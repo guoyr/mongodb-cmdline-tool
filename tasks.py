@@ -359,6 +359,6 @@ def self_update(c):
     """
     print_bold('Updating MongoDB Server Commandline Tool...')
     with c.cd(str(kPackageDir)):
-        c.run('git fetch', warn=False)
-        c.run('git rebase', warn=False)
+        c.run('git fetch', warn=False, hide='both')
+        c.run('git rebase', warn=False, hide='both')
         _post_update_steps(c)
