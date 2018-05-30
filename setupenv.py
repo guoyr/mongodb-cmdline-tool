@@ -101,7 +101,7 @@ def macos(c):
 
     print_bold('Checking HomeBrew is installed')
     res = c.run('brew --version', hide='both')
-    _check_homebrew_exists(res)
+    _check_homebrew_exists(c)
 
     print_bold('Installing Text Editor')
     _install_editor(c)
