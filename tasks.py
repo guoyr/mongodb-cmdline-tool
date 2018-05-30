@@ -147,7 +147,7 @@ def lint(c, eslint=False):
 
     :param eslint: Run ESLint for JS files. Default: False.
     """
-    init()
+    init(c)
     with c.cd(str(kHome / 'mongo')):
         if eslint:
             c.run('python2 buildscripts/eslint.py fix')
