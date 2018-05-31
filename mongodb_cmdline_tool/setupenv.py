@@ -45,7 +45,7 @@ jira_username = None
 jira_password = None
 sudo_password = None
 
-
+@task
 def get_passwords(c):
     global jira_password
     global sudo_password
