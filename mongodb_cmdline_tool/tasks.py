@@ -16,8 +16,8 @@ jira_cli = None
 
 kHome = pathlib.Path.home()
 
-kPackageDir = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
-
+# kPackageDir = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
+kPackageDir = kHome / '.config' / 'mongodb-cmdline-tool'
 
 def get_jira():
     global jira_cli
@@ -361,4 +361,7 @@ def self_update(c):
     with c.cd(str(kPackageDir)):
         c.run('git fetch', warn=False, hide='both')
         c.run('git rebase', warn=False, hide='both')
+
+        # Ignore failures if we can't install or upgrade with pip3.
+        c.run('pip3 install --upgrade .', warn=True)
         _post_update_steps(c)
