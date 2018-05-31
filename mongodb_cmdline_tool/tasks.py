@@ -175,12 +175,13 @@ def commit(c):
     print_bold('Committed local changes')
 
 
-@task(aliases='r', optional=['new_cr'])
-def review(c, new_cr=False):
+@task(aliases='r', optional=['new_cr', 'no_browser'])
+def review(c, new_cr=False, no_browser=False):
     """
     Step 5: Put your code up for code review.
 
     :param new_cr: whether to create a new code review. Use it if you have multiple CRs for the same ticket. (Default: False)
+    :param no_browser: Set it if you're running this script in a ssh terminal.
     """
     init(c)
     commit_num, branch_num = _get_ticket_numbers(c)
@@ -203,6 +204,9 @@ def review(c, new_cr=False):
     else:
         # New issue, add title.
         cmd += f' -t "{commit_msg}"'
+
+    if no_browser:
+        cmd += ' --no_oauth2_webbrowser'
 
     print('Authenticating with OAuth2... If your browser did not open, press enter')
     res = c.run(cmd, hide='stdout')
