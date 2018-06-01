@@ -332,6 +332,8 @@ def finalize(c, push=False, branch='master'):
             del cache[branch_num]
             _store_cache(c, cache)
 
+        c.run(f'git branch -d {feature_branch}')
+
         # TODO: Update Jira and close CR.
         # jirac = get_jira()
         # if jirac:
@@ -369,3 +371,14 @@ def self_update(c):
         # Ignore failures if we can't install or upgrade with pip3.
         c.run('pip3 install --upgrade .', warn=True)
         _post_update_steps(c)
+
+
+@task(aliases='j')
+def open_jira(c):
+    """
+    Open the Jira link for the ticket you're currently working on.
+    """
+    commit_num, branch_num = _get_ticket_numbers(c)
+    print_bold(f'opening Jira for ticket SERVER-{branch_num}')
+
+    webbrowser.open(f'https://jira.mongodb.org/browse/SERVER-{branch_num}')
