@@ -373,12 +373,16 @@ def self_update(c):
         _post_update_steps(c)
 
 
-@task(aliases='j')
-def open_jira(c):
+@task(aliases='j', optional=['ticket'])
+def open_jira(c, ticket=None):
     """
     Open the Jira link for the ticket you're currently working on.
+
+    :param ticket: ticket number without project name (Default: your current git branch)
     """
     commit_num, branch_num = _get_ticket_numbers(c)
     print_bold(f'opening Jira for ticket SERVER-{branch_num}')
 
-    webbrowser.open(f'https://jira.mongodb.org/browse/SERVER-{branch_num}')
+    if not ticket:
+        ticket = branch_num
+    webbrowser.open(f'https://jira.mongodb.org/browse/SERVER-{ticket}')
