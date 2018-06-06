@@ -175,8 +175,8 @@ def commit(c):
     print_bold('Committed local changes')
 
 
-@task(aliases='r', optional=['new_cr', 'no_browser'])
-def review(c, new_cr=False, no_browser=False):
+@task(aliases='r', optional=['new_cr', 'browser'])
+def review(c, new_cr=False, browser=True):
     """
     Step 5: Put your code up for code review.
 
@@ -205,7 +205,7 @@ def review(c, new_cr=False, no_browser=False):
         # New issue, add title.
         cmd += f' -t "{commit_msg}"'
 
-    if no_browser:
+    if not browser:
         cmd += ' --no_oauth2_webbrowser'
 
     print('Authenticating with OAuth2... If your browser did not open, press enter')

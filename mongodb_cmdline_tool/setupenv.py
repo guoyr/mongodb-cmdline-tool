@@ -15,6 +15,8 @@ from mongodb_cmdline_tool.utils import print_bold, format_bold, clear_screen, ge
 kHome = pathlib.Path.home()
 kOptDir = pathlib.Path('/opt')
 kDownloadsCache = pathlib.Path(tempfile.mkdtemp())
+kPackageDir = pathlib.Path(os.path.dirname(os.path.realpath(__file__)))
+kConfigDir = kHome / '.config'
 
 # Exit code.
 kCommandNotFound = 127
@@ -24,21 +26,21 @@ kSuccess = 0
 env_editor = None
 
 # Toolchain constants.
-kToolchainURL = 'https://s3.amazonaws.com/mciuploads/toolchain-builder/osx/582c6906ccb18840cebf647fb962c2ce9b8d2e10/' \
-                'toolchain_builder_osx_582c6906ccb18840cebf647fb962c2ce9b8d2e10_18_05_22_19_32_34.tar.gz'
+kToolchainURL = 'https://s3.amazonaws.com/mciuploads/toolchain-builder/osx/f8033c8bd540e5fd904713746442547105649b30' \
+                '/toolchain_builder_osx_f8033c8bd540e5fd904713746442547105649b30_18_06_01_18_46_58.tar.gz'
 
 # Evergreen constants
 kEvgToolURL = 'https://evergreen.mongodb.com/clients/darwin_amd64/evergreen'
 kEvgConfigPath = pathlib.Path.home() / '.evergreen.yml'
 
 # GitHub constants
-kGitHubAddSSHHelpURL = 'https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/#adding-your-ssh-key-to-the-ssh-agent/#platform-mac'
+kGitHubAddSSHHelpURL = 'https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/#platform-mac'
 kRepositoryURLs = {
     'mongo': 'git@github.com:mongodb/mongo.git',
     'kernel-tools': 'git@github.com:10gen/kernel-tools.git'
 }
 
-kPackageDir = os.path.dirname(os.path.realpath(__file__))
+
 
 # Runtime configuration
 jira_username = None
