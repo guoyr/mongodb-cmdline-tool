@@ -314,9 +314,11 @@ def finalize(c, push=False, branch='master'):
 
     res = c.run(f'git rebase {branch}', warn=True)
     if res.return_code != 0:
-        print(f'Did not rebase cleanly onto {branch}, please manually run: git rebase {branch}')
+        print(f'[ERROR] Did not rebase cleanly onto {branch}, please manually run: git rebase {branch}')
         c.run(f'git checkout {feature_branch}')
+        sys.exit(1)
     c.run(f'git checkout {branch}')
+    c.run(f'git merge {feature_branch}')
 
     push_cmd = 'git push'
     if not push:
