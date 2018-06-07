@@ -116,6 +116,7 @@ def new(c, ticket_number, branch='master'):
         c.run(f'git checkout server{ticket_number}', hide='both')
     else:
         print_bold(f'Updating {branch} to latest and creating new branch: server{ticket_number}')
+        c.run(f'git checkout {branch}')
         _git_refresh(c, branch)
         c.run(f'git checkout -B server{ticket_number}', hide='both')
 
