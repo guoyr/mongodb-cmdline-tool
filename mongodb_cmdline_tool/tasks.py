@@ -214,7 +214,7 @@ def review(c, new_cr=False, browser=True):
         cache[commit_num] = {}
 
     issue_number = cache[commit_num].get('cr', None)
-    project = cache[commit].get('project', 'server')
+    project = cache[commit_num].get('project', 'server')
 
     commit_msg = c.run('git log --oneline -1 --pretty=%s', hide=True).stdout.strip()
 
