@@ -173,15 +173,18 @@ def commit(c):
     Step 4: Wrapper around git commit to automatically add changes and fill in the ticket number in the commit message.
     """
     init(c)
-    c.run('git add -u')
-    c.run('git add src/')
-    c.run('git add jstests/')
 
     commit_num, branch_num = _get_ticket_numbers(c)
 
     cache = _load_cache(c)
 
     project = cache.get(branch_num, {}).get('project', 'server')
+
+    c.run('git add -u')
+
+    if project == 'server':
+        c.run('git add src/')
+        c.run('git add jstests/')
 
     if commit_num == branch_num:
         c.run('git commit --amend --no-edit')
