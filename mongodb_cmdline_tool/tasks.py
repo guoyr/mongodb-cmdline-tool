@@ -36,6 +36,7 @@ def get_jira():
         except:
             print('Failed to connect to Jira')
 
+    print_bold('Updating ticket in Jira. Please wait...')
     return jira_cli
 
 
@@ -63,9 +64,9 @@ def _strip_proj(ticket_number):
 
 def _get_ticket_numbers(c):
     """Get the ticket numbers from the commit and the branch."""
-    branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
+    branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
     ticket_number = _strip_proj(branch)
-    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide=True).stdout
     commit_ticket_number = _strip_proj(commit_msg)
     return commit_ticket_number, ticket_number
 
@@ -86,11 +87,11 @@ def _store_cache(c, cache_dict):
 
 
 def _git_refresh(c, branch):
-    old_branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
-    c.run(f'git checkout {branch}')
+    old_branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
+    c.run(f'git checkout {branch}', hide=True)
     c.run(f'git fetch origin {branch}')
-    c.run(f'git rebase origin/{branch}')
-    c.run(f'git checkout {old_branch}')
+    c.run(f'git rebase origin/{branch}', hide=True)
+    c.run(f'git checkout {old_branch}', hide=True)
 
 
 def _post_update_steps(c):
@@ -100,35 +101,46 @@ def _post_update_steps(c):
     pass
 
 
-@task(aliases='n', positional=['ticket_number'], optional=['branch'])
-def new(c, ticket_number, branch='master'):
+@task(aliases='n', positional=['ticket_number'], optional=['branch', 'project'])
+def new(c, ticket_number, branch='master', project='server'):
     """
     Step 1: Create or switch to the branch for a ticket.
 
     :param ticket_number: Digits of the Jira ticket.
     :param branch: Base branch for this ticket. Default: master.
+    :param project: Jira project. Default: server.
     """
     init(c)
     ticket_number = _strip_proj(ticket_number)
 
-    res = c.run(f'git rev-parse --verify server{ticket_number}', warn=True, hide=True)
+    project = project.lower()
+
+    res = c.run(f'git rev-parse --verify {project}{ticket_number}', warn=True, hide=True)
     if res.return_code == 0:
-        c.run(f'git checkout server{ticket_number}', hide='both')
+        c.run(f'git checkout {project}{ticket_number}', hide='both')
     else:
         print_bold(f'Updating {branch} to latest and creating new branch: server{ticket_number}')
         c.run(f'git checkout {branch}')
         _git_refresh(c, branch)
-        c.run(f'git checkout -B server{ticket_number}', hide='both')
+        c.run(f'git checkout -B {project}{ticket_number}', hide='both')
 
         jirac = get_jira()
         if jirac:
-            issue = jirac.issue(f'SERVER-{ticket_number}')
+            issue = jirac.issue(f'{project.upper()}-{ticket_number}')
             if issue.fields.status.id == '1':  # '1' = Open
-                print_bold(f'Transitioning SERVER-{ticket_number} in Jira to "In Progress"')
+                print_bold(
+                    f'Transitioning {project.upper()}-{ticket_number} in Jira to "In Progress"')
                 jirac.transition_issue(issue, '4')  # '4' = Start Progress
             else:
                 print_bold(
-                    f'SERVER-{ticket_number} in Jira is not in "Open" status, not updating Jira')
+                    f'{project.upper()}-{ticket_number} in Jira is not in "Open" status, not updating Jira')
+
+    cache = _load_cache(c)
+    if ticket_number not in cache:
+        cache[ticket_number] = {}
+
+    cache[ticket_number]['project'] = project
+    _store_cache(c, cache)
 
 
 @task(aliases='s')
@@ -167,11 +179,15 @@ def commit(c):
 
     commit_num, branch_num = _get_ticket_numbers(c)
 
+    cache = _load_cache(c)
+
+    project = cache.get(branch_num, {}).get('project', 'server')
+
     if commit_num == branch_num:
         c.run('git commit --amend --no-edit')
     else:
         raw_commit_msg = input('Please enter the commit message (without ticket number): ')
-        c.run(f'git commit -m "SERVER-{branch_num} {raw_commit_msg}"')
+        c.run(f'git commit -m "{project.upper()}-{branch_num} {raw_commit_msg}"')
 
     print_bold('Committed local changes')
 
@@ -191,15 +207,19 @@ def review(c, new_cr=False, browser=True):
         sys.exit(1)
 
     cache = _load_cache(c)
-    if commit_num in cache and 'cr' in cache[commit_num]:
-        issue_number = cache[commit_num]['cr']
-    else:
+    if commit_num not in cache:
         cache[commit_num] = {}
-        issue_number = None
 
-    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout.strip()
-    cmd = f'python2 {kPackageDir / "upload.py"} --rev HEAD~1 --nojira -y ' \
-          f'--git_similarity 90 --check-clang-format --check-eslint'
+    issue_number = cache[commit_num].get('cr', None)
+    project = cache[commit].get('project', 'server')
+
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide=True).stdout.strip()
+
+    cmd = f'python2 {kPackageDir / "upload.py"} --rev HEAD~1 --nojira -y '
+
+    if project == 'server':
+        cmd += '--git_similarity 90 --check-clang-format --check-eslint'
+
     if issue_number and not new_cr:
         cmd += f' -i {issue_number}'
     else:
@@ -219,11 +239,11 @@ def review(c, new_cr=False, browser=True):
 
         jirac = get_jira()
         if jirac:
-            ticket = get_jira().issue(f'SERVER-{commit_num}')
+            ticket = get_jira().issue(f'{project.upper()}-{commit_num}')
 
             # Transition Ticket
             if ticket.fields.status.id == '3':  # '3' = In Progress.
-                print_bold(f'Transitioning SERVER-{branch_num} in Jira to "Start Code Review"')
+                print_bold(f'Transitioning {project.upper()}-{branch_num} in Jira to "Start Code Review"')
                 jirac.transition_issue(ticket, '761')  # '4' = Start Code Review
 
                 # Add comment.
@@ -237,7 +257,7 @@ def review(c, new_cr=False, browser=True):
                     f'SERVER-{branch_num} in Jira is not in "In Progress" status, not updating Jira')
         else:
             print_bold(f'Please manually add a link of your codereview to: '
-                       f'https://jira.mongodb.org/browse/SERVER-{commit_num}')
+                       f'https://jira.mongodb.org/browse/{project.upper()}-{commit_num}')
 
     if not issue_number:
         print('[ERROR] Something went wrong, no CR issue number was found')
@@ -263,8 +283,8 @@ def patch(c, branch='master', finalize=False):
     """
     init(c)
     temp_branch = 'patch-build-branch'
-    feature_branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
-    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide='both').stdout.strip()
+    feature_branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
+    commit_msg = c.run('git log --oneline -1 --pretty=%s', hide=True).stdout.strip()
 
     commit_num, branch_num = _get_ticket_numbers(c)
     if commit_num != branch_num:
@@ -280,6 +300,7 @@ def patch(c, branch='master', finalize=False):
             print(f'[WARNING] {feature_branch} did not rebase cleanly. Please manually run '
                   f'"git rebase {branch}" and retry the patch build again')
             c.run('git rebase --abort')
+            sys.exit(1)
         else:
             cmd = f'evergreen patch -y -d "{commit_msg}"'
             if finalize:
@@ -308,7 +329,7 @@ def finalize(c, push=False, branch='master'):
         print('[ERROR] Please commit your local changes before finalizing.')
         sys.exit(1)
 
-    feature_branch = c.run('git rev-parse --abbrev-ref HEAD', hide='both').stdout
+    feature_branch = c.run('git rev-parse --abbrev-ref HEAD', hide=True).stdout
 
     _git_refresh(c, branch)
 
@@ -328,9 +349,12 @@ def finalize(c, push=False, branch='master'):
     if res.return_code != 0:
         print('[ERROR] git push failed!')
         c.run(f'git checkout {feature_branch}')
+        sys.exit(1)
+
+    cache = _load_cache(c)
+    project = cache.get(branch_num, {}).get('project', 'server')
 
     if push:
-        cache = _load_cache(c)
         if branch_num in cache:
             del cache[branch_num]
             _store_cache(c, cache)
@@ -356,7 +380,7 @@ def finalize(c, push=False, branch='master'):
     print_bold(
         'Please remember to close this issue and add a comment of your patch build link '
         'if you haven\'t already. The comment should have "Developer" visibility')
-    print_bold(f'https://jira.mongodb.com/browse/SERVER-{branch_num}')
+    print_bold(f'https://jira.mongodb.com/browse/{project}-{branch_num}')
 
     self_update(c)
 
@@ -384,8 +408,14 @@ def open_jira(c, ticket=None):
     :param ticket: ticket number without project name (Default: your current git branch)
     """
     commit_num, branch_num = _get_ticket_numbers(c)
-    print_bold(f'opening Jira for ticket SERVER-{branch_num}')
+
+    cache = _load_cache(c)
+
+    project = cache.get(branch_num, {}).get('project', 'server')
+
+    print_bold(f'opening Jira for ticket {project.upper()}-{branch_num}')
 
     if not ticket:
         ticket = branch_num
-    webbrowser.open(f'https://jira.mongodb.org/browse/SERVER-{ticket}')
+
+    webbrowser.open(f'https://jira.mongodb.org/browse/{project.upper()}-{ticket}')
